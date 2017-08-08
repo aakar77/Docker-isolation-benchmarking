@@ -2,32 +2,30 @@ import docker
 from itertools import izip
 import json
 
+
+
 # Method 1 of creating and running the containers without docker run command.
 
 #client = docker.APIClient(base_url='unix://var/run/docker.sock')
 
 clientAPI = docker.from_env()
-# Creating a container and getting the container ID
 
 cLogFileObj = open("mplayerContainerOutput.txt", "w+")
-#containerStat = open("mplayerContainer", "w+")
+containerStat = open("mplayerContainer.txt", "w+")
 
-containerObj = clientAPI.containers.create('docker-mplayer-i')
+containerObj = clientAPI.containers.create('python-prog') # Creating a container with an image
 containerObj.start()
 
+cLogString = ''
 
+while(containerObj != "exited"):
+	
+	cLogString += containerObj.logs() # Getting Container output as a string
+	print cLogString
 
-'''
-
-cLogString = containerObj.logs(stdout=True, stderr=True)
-print cLogString
 
 cLogFileObj.write(cLogString)
 cLogFileObj.close()
-
-
-containerObj.stop()
-containerObj.remove() 
 
 '''
 
@@ -47,31 +45,33 @@ while(containerObj.status != "exited"):
     containerObj.stop()
     containerObj.remove() 
 
-'''
 cStatsDict = containerObj.stats(decode=True)
 
-Dumping the stats api method output for a docker container
+#Dumping the stats api method output for a docker container
 
-while(containerObj.status != "exited"):
+while(containerObj.status != "exited" and containerObj.status == "running"):
 
   try:
-    for a in izip(z):
-      json.dump(a,f,indent = 4)
+    for a in izip(cStatsDict):
+      json.dump(a,containerStat,indent = 4)
       
   except KeyboardInterrupt:
-    f.close()
-    containerObj.stop()
-    containerObj.remove() 
-	
+    containerStat.close()
+    
 '''
+	
+
+
+containerObj.stop()
+containerObj.remove() 
 
 
 
+'''
 #print ''.join(z)
 #for x in z:
 #       yield z
 #      next(z)
-'''
 
 #print(x)
 

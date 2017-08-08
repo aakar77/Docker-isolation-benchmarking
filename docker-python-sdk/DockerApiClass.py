@@ -44,72 +44,16 @@ class docker_sdk_abstraction():
     self.docker_api_obj = docker.from_env() 
     self.container_obj = None
 
-  def container_create(self, docker_image_tag_name):
-    '''
-     <Purpose>
-      Create a docker container using containers.create method.
-      Inigtializes the docker API container class object.
-
-    <Arguments>
-      1) Image name for which container is to created.
-      2) A Dictonary which can be used for setting up the arguments for the containers.create() method.  
-    '''
-
-    self.container_obj = self.docker_api_obj.containers.create(docker_image_tag_name) 
- 
-
-  def container_start(self):
-    '''
-     <Purpose>
-      Invoke Docker API container class object start method.
-      Starts the docker container
-
-    <Arguments>
-      None  
-    '''
-    
-    self.container_obj.start()
-
-  
-  
-  def container_run(self, docker_image_tag_name, detach_mode):
-    
-    if (detach_mode == False):
-      # Dokcer container will run on foreground
-      # Output = docker container logs
-      # Will not return untill container execution completes
-
-      container_run_log = self.docker_api_obj.containers.run(docker_image_tag_name, detach=detach_mode)
-      return container_run_log
-    
-    else:
-      # Docker container won't run in foreground
-      # Output of the containers.run method = Containe class object
-      
-      self.container_obj = self.docker_api_obj.containers.run(docker_image_tag_name, detach=detach_mode)
-
-  def container_stats_stream(self):
-    pass    
-
-
-  def container_log_stream(self):
-    pass
-
-
-  def container_log(self):
-    pass
-
-
-  def get_container_process(self):
-    pass
-
-
-
   # Following are the Getter methods for getting Docker Api Container Object attributes
 
   def get_container_id(self):
 
     return self.container_obj.id
+
+  def get_container_id_short(self):
+
+    return self.container_obj.short_id
+
   
   def get_container_name(self):
 
@@ -123,12 +67,80 @@ class docker_sdk_abstraction():
 
     return self.container_status
 
+  # Following are the class methods 
 
+  def container_create(self, docker_image_tag_name):
+    '''
+     <Purpose>
+      Create a docker container using containers.create method.
+      Inigtializes the docker API container class object.
+
+    <Arguments>
+      1) Image name for which container is to created.
+      2) A Dictonary which can be used for setting up the arguments for the containers.create() method.  
+    '''
+    self.container_obj = self.docker_api_obj.containers.create(docker_image_tag_name) 
+ 
+
+  def container_start(self):
+    '''
+     <Purpose>
+      Invoke Docker API container class object start method.
+      Starts the docker container
+
+    <Arguments>
+      None  
+    '''    
+    self.container_obj.start()
+  
+  def container_run(self, docker_image_tag_name, detach_mode):
+    
+    if (detach_mode == False):
+      # Docker container will run on foreground
+      # Output = docker container logs
+      # Will not return untill container execution completes
+
+      container_run_log = self.docker_api_obj.containers.run(docker_image_tag_name, detach=detach_mode)
+      return container_run_log
+    
+    else:
+      # Docker container won't run in foreground
+      # Output of the containers.run method = Container class object
+
+      self.container_obj = self.docker_ai_obj.containers.run(docker_image_tag_name, detach=detach_mode)
+
+  def container_log(self):
+    
+    container_end_log = self.container_obj.logs(stdout = True, stderr = True, stream = False, follow = True) 
+    container_end_log.replace("\r", "\n")
+
+    filename = self.get_container_id_short() + "-output-file.log"
+
+    log_file_obj = open(filename, "w+")
+    log_file_obj.write(container_end_log)
+    log_file_obj.close()
+
+  def container_stats_stream(self):
+    pass    
+
+
+  def container_log_stream(self):
+    pass
+
+
+  def get_container_process(self):
+    pass
 
 object1 = docker_sdk_abstraction()
 
-container_log = object1.container_run("python-prog", False)
-print (container_log)
+object1.container_create("python-prog")
+object1.container_start()
+
+while(object1.get_container_status == "running"):
+  pass
+
+object1.container_log()
+
 
 # object1.start_container()
 

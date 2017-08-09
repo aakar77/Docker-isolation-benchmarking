@@ -17,7 +17,7 @@ Important Note:
 
 Special Note:
   Three ways for creating a docker container
-  1) Use Docker SDK docker run method  - using detached = false - Will run container in foreground
+  1) Use Docker SDK docker run method - using detached = false - Will run container in foreground
   2) Use Docker SDK docker run method - using detached = True - Will run the container in backrgoud; returns container class object
   3) Use Docker SDK docker create method; gives container class object and then invoke start method on the container object.
 
@@ -37,7 +37,7 @@ class docker_sdk_abstraction():
      <Purpose>
       Initializes the Docker API client object.
       Initializes the Docker API container class object to None. 
-
+      container_obj will be initialized while container_create / container_run methods.
     <Arguments>
       None
     '''
@@ -47,20 +47,49 @@ class docker_sdk_abstraction():
   # Following are the Getter methods for getting Docker Api Container Object attributes
 
   def get_container_id(self):
-
+    '''
+     <Purpose>
+      For returning the container object id attribute. id attribute is container's id
+    <Arguments>
+      None
+    <Return>
+      Returns the container ID to which the object is pointing to  
+    '''  
     return self.container_obj.id
 
   def get_container_id_short(self):
-
+    '''
+     <Purpose>
+      Get method for container object short id(truncated to 10 character) attribute.
+    <Arguments>
+      None
+    <Return>
+      Returns the 10 charcter container ID to which the object is pointing to  
+    '''  
     return self.container_obj.short_id
 
   
   def get_container_name(self):
-
+    '''
+     <Purpose>
+      Get method for container object name attribute. 
+      It is by default assigned by the docker container if not specified while docker run / docker create
+    <Arguments>
+      None
+    <Return>
+      Returns the 10 charcter container ID to which the object is pointing to  
+    '''
     return self.container_obj.name
 
   def get_container_image(self):
-
+    '''
+     <Purpose>
+      Get method for the container's object image attribute.
+    <Arguments>
+      None
+    <Return>
+      Returns the container image name for example <Image: 'python-prog:latest'>  
+    '''
     return self.container_obj.image
 
   def get_container_status(self):
@@ -110,12 +139,26 @@ class docker_sdk_abstraction():
       self.container_obj = self.docker_ai_obj.containers.run(docker_image_tag_name, detach=detach_mode)
 
   def container_log(self):
-    
+    '''
+     <Purpose>
+      This method is for getting the container log after container has stopped running.
+      It creates a log file with the filename as container short id + output-file.log
+    <Arguments>
+      None
+    <Return>
+      None  
+    '''
+
+    #Calling container object logs method - stream is False and Follow is True
     container_end_log = self.container_obj.logs(stdout = True, stderr = True, stream = False, follow = True) 
+    
+    # Formatting the log output
     container_end_log.replace("\r", "\n")
 
+    # Creating file name
     filename = self.get_container_id_short() + "-output-file.log"
 
+    # Creating and writting into the log file
     log_file_obj = open(filename, "w+")
     log_file_obj.write(container_end_log)
     log_file_obj.close()
@@ -134,6 +177,9 @@ class docker_sdk_abstraction():
 object1 = docker_sdk_abstraction()
 
 object1.container_create("python-prog")
+
+print object1.get_container_image()
+
 object1.container_start()
 
 while(object1.get_container_status == "running"):

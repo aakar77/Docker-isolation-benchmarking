@@ -27,6 +27,7 @@ Special Note:
 import docker
 from itertools import izip
 import json
+import datetime
 
 
 class docker_sdk_abstraction():
@@ -81,7 +82,7 @@ class docker_sdk_abstraction():
     '''
     return self.container_obj.name
 
-  def get_container_image(self):
+  def get_container_image_name(self):
     '''
      <Purpose>
       Get method for the container's object image attribute.
@@ -90,7 +91,7 @@ class docker_sdk_abstraction():
     <Return>
       Returns the container image name for example <Image: 'python-prog:latest'>  
     '''
-    return self.container_obj.image
+    return  str(self.container_obj.image)
 
   def get_container_status(self):
 
@@ -143,6 +144,7 @@ class docker_sdk_abstraction():
      <Purpose>
       This method is for getting the container log after container has stopped running.
       It creates a log file with the filename as container short id + output-file.log
+
     <Arguments>
       None
     <Return>
@@ -156,54 +158,37 @@ class docker_sdk_abstraction():
     container_end_log.replace("\r", "\n")
 
     # Creating file name
-    filename = self.get_container_id_short() + "-output-file.log"
+    filename = self.get_container_id_short() +"-"+self.get_container_image_name()+"-output-file.log"
 
     # Creating and writting into the log file
     log_file_obj = open(filename, "w+")
     log_file_obj.write(container_end_log)
     log_file_obj.close()
 
-  def container_stats_stream(self):
-
-    self.container_obj.reload()
-
-    # Creating file name
-    filename = self.get_container_id_short() + "-stats-file.log"
-
-    stat_file_obj = open(filename, "w+")
-
-    # Gives generator stream object helper
-    stats_stream = self.container_obj.stats(decode=True)
-    
-    print self.get_container_status()
-
-    for data in izip(stats_stream):
-
-      self.container_obj.reload()
-      
-      #print self.get_container_status()
-        
-      json.dump(data, stat_file_obj, indent = 4)  
-
-      if(self.get_container_status() == "exited"):
-        stat_file_obj.close()
-        break
-
-   
-    
 
   def container_log_stream(self):
-    
+    '''
+    <Purpose>
+      This method is for getting the container log throughout the container execution.
+      It creates a log file with the filename as container short id + image name + output-file.log.
+      This method will return back only after the container has completed its execution. i.e. status = exited.
+    <Arguments>
+      None
+    <Return>
+      None  
+    '''
+
+
+
     # Reloading the container object attributes, especially needed for the status
     self.container_obj.reload()
 
-    # Formatting the log output
-    container_end_log.replace("\r", "\n")
-
     # Creating file name for the log file
-    filename = self.get_container_id_short() + "-output-file.log"
+    filename = self.get_container_id_short()+"-"+self.get_container_image_name()+"-output-file.log"
 
     log_file_obj = open(filename, "w+")
+
+
 
     # Gives generator stream object helper
     log_stream = self.container_obj.logs(stdout = True, stderr = True, stream = True, follow = True)
@@ -212,25 +197,76 @@ class docker_sdk_abstraction():
 
       # Reloading the container object atrributes, more concerned for container status = exited
       self.container_obj.reload()
-          
+      
+      # Formatting the stream data tuple
+      data = "".join(data)
+      data.replace("\r", "\n")
+
+      # Dumping the data into file
       json.dump(data, log_file_obj)  
 
       if(self.get_container_status() == "exited"):
         stat_file_obj.close()
         break
 
+  def container_stats_stream(self):
+    '''
+    <Purpose>
+      This method is for getting the statistics stream during the container execution.
+      It creates a stats file with the filename as container short id + stat-file.log.
+      This method will return back only after the container has completed its execution. i.e. status = exited
+
+      Next Task would be: Manually logging cpu and memory data and calculating average over them.
+    <Arguments>
+      None
+    <Return>
+      None  
+    '''
+
+    self.get_container_process()
+
+    # Updating the container object attributes  
+    self.container_obj.reload()
+
+    # Creating file name. 
+    filename = self.get_container_id_short() +"-"+self.get_container_image_name()+"-stats-file.log"
+
+    stat_file_obj = open(filename, "w+")
+
+    # Gives generator stream object helper
+    stats_stream = self.container_obj.stats(decode=True)
     
+    for data in izip(stats_stream):
+
+      # Updating the container object attributes, especially the container status
+      self.container_obj.reload()
+      
+      self.get_container_process()
+      
+      # Dumping the stats stream data, in the file 
+      json.dump(data, stat_file_obj, indent = 4)  
+
+      # If the container has exited, close the file object and break the for loop
+      if(self.get_container_status() == "exited"):
+        stat_file_obj.close()
+        break
+
 
   def get_container_process(self):
-    pass
+    processes = self.container_obj.top()
+    print processes
 
 object1 = docker_sdk_abstraction()
 
-object1.container_create("python-prog")
+object1.container_create("docker-cpu-hog-i")
 object1.container_start()
 
-object1.container_stats_stream()
+print object1.get_container_image_name()
 
+#object1.container_log_stream()
+
+
+object1.container_stats_stream()
 object1.container_log()
 
 

@@ -94,7 +94,7 @@ class docker_sdk_abstraction():
 
   def get_container_status(self):
 
-    return self.container_status
+    return self.container_obj.status
 
   # Following are the class methods 
 
@@ -164,12 +164,62 @@ class docker_sdk_abstraction():
     log_file_obj.close()
 
   def container_stats_stream(self):
-    pass    
 
+    self.container_obj.reload()
+
+    # Creating file name
+    filename = self.get_container_id_short() + "-stats-file.log"
+
+    stat_file_obj = open(filename, "w+")
+
+    # Gives generator stream object helper
+    stats_stream = self.container_obj.stats(decode=True)
+    
+    print self.get_container_status()
+
+    for data in izip(stats_stream):
+
+      self.container_obj.reload()
+      
+      #print self.get_container_status()
+        
+      json.dump(data, stat_file_obj, indent = 4)  
+
+      if(self.get_container_status() == "exited"):
+        stat_file_obj.close()
+        break
+
+   
+    
 
   def container_log_stream(self):
-    pass
+    
+    # Reloading the container object attributes, especially needed for the status
+    self.container_obj.reload()
 
+    # Formatting the log output
+    container_end_log.replace("\r", "\n")
+
+    # Creating file name for the log file
+    filename = self.get_container_id_short() + "-output-file.log"
+
+    log_file_obj = open(filename, "w+")
+
+    # Gives generator stream object helper
+    log_stream = self.container_obj.logs(stdout = True, stderr = True, stream = True, follow = True)
+    
+    for data in izip(log_stream):
+
+      # Reloading the container object atrributes, more concerned for container status = exited
+      self.container_obj.reload()
+          
+      json.dump(data, log_file_obj)  
+
+      if(self.get_container_status() == "exited"):
+        stat_file_obj.close()
+        break
+
+    
 
   def get_container_process(self):
     pass
@@ -177,15 +227,20 @@ class docker_sdk_abstraction():
 object1 = docker_sdk_abstraction()
 
 object1.container_create("python-prog")
-
-print object1.get_container_image()
-
 object1.container_start()
 
-while(object1.get_container_status == "running"):
-  pass
+object1.container_stats_stream()
 
 object1.container_log()
+
+
+#print object1.get_container_image()
+
+
+
+#while(object1.get_container_status == "running"):
+#  pass
+
 
 
 # object1.start_container()

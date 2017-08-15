@@ -32,7 +32,6 @@ import datetime
 
 class docker_sdk_abstraction():
 
-
   def __init__(self):
     '''
      <Purpose>
@@ -44,6 +43,7 @@ class docker_sdk_abstraction():
     '''
     self.docker_api_obj = docker.from_env() 
     self.container_obj = None
+    self.process_set = set()
 
   # Following are the Getter methods for getting Docker Api Container Object attributes
 
@@ -68,8 +68,7 @@ class docker_sdk_abstraction():
       Returns the 10 charcter container ID to which the object is pointing to  
     '''  
     return self.container_obj.short_id
-
-  
+ 
   def get_container_name(self):
     '''
      <Purpose>
@@ -97,6 +96,37 @@ class docker_sdk_abstraction():
 
     return self.container_obj.status
 
+  def get_container_process(self):
+    return self.process_set
+
+
+  def set_container_process(self):
+
+    if(self.get_container_status() != "exited"):
+      
+      # docker container object top method, it gives process ids currently running in the form of a list
+      process_dict = self.container_obj.top()
+
+      nested_list = process_dict.get("Processes")
+  
+      for list_a in nested_list:
+        self.process_set.add(list_a[1]) # Process ID
+        self.process_set.add(list_a[2]) # Parent Process
+
+        print self.get_container_process()
+
+      """ 
+      It gives the process ID of processes running inside the container in format like
+
+      {u'Processes': [[u'root', u'27138', u'27121', u'30', u'16:36', u'?', u'00:00:01', 
+       u'mplayer -benchmark -vo null -ao null ./Sintel.mp4']], 
+       u'Titles': [u'UID', u'PID', u'PPID', u'C', u'STIME', u'TTY', u'TIME', u'CMD']}
+  
+        Planning to : Make a list attribute for class and add process IDs to it
+        Update the list periodically. By calling the method get_contianer_process method
+      
+      """
+
   # Following are the class methods 
 
   def container_create(self, docker_image_tag_name, container_arguments):
@@ -114,7 +144,6 @@ class docker_sdk_abstraction():
 
     self.container_obj = self.docker_api_obj.containers.create(docker_image_tag_name, **container_arguments) 
  
-
   def container_start(self):
     '''
      <Purpose>
@@ -135,8 +164,6 @@ class docker_sdk_abstraction():
 
       container_run_log = self.docker_api_obj.containers.run(docker_image_tag_name, detach=detach_mode)
       return container_run_log
-
-
     
     else:
       # Docker container won't run in foreground
@@ -156,6 +183,9 @@ class docker_sdk_abstraction():
       None  
     '''
 
+    #Updating container's processes 
+    self.set_container_process()
+
     #Calling container object logs method - stream is False and Follow is True
     container_end_log = self.container_obj.logs(stdout = True, stderr = True, stream = False, follow = True) 
     
@@ -169,7 +199,6 @@ class docker_sdk_abstraction():
     log_file_obj = open(filename, "w+")
     log_file_obj.write(container_end_log)
     log_file_obj.close()
-
 
   def container_log_stream(self):
     '''
@@ -191,6 +220,10 @@ class docker_sdk_abstraction():
 
     log_file_obj = open(filename, "w+")
 
+
+    #update container procees set attribute
+    self.container_obj.set_container_process()
+
     # Gives generator stream object helper
     log_stream = self.container_obj.logs(stdout = True, stderr = True, stream = True, follow = True)
     
@@ -205,6 +238,9 @@ class docker_sdk_abstraction():
 
       # Dumping the data into file
       json.dump(data, log_file_obj)  
+
+      #update container procees set attribute
+      self.set_container_process()
 
       if(self.get_container_status() == "exited"):
         stat_file_obj.close()
@@ -247,27 +283,15 @@ class docker_sdk_abstraction():
       # Dumping the stats stream data, in the file 
       json.dump(data, stat_file_obj, indent = 4)  
 
+      #update container procees set attribute
+      self.set_container_process()
+
       # If the container has exited, close the file object and break the for loop
       if(self.get_container_status() == "exited"):
         stat_file_obj.close()
         break
 
-
-  def get_container_process(self):
-
-    if(self.get_container_status() != "exited"):
-      processes = self.container_obj.top()
-      print str(processes) + "\n"
-
-      ''' It gives the process ID of processes running inside the container in format like
-
-         {u'Processes': [[u'root', u'27138', u'27121', u'30', u'16:36', u'?', u'00:00:01', 
-         u'mplayer -benchmark -vo null -ao null ./Sintel.mp4']], 
-         u'Titles': [u'UID', u'PID', u'PPID', u'C', u'STIME', u'TTY', u'TIME', u'CMD']}
-  
-        Planning to : Make a list attribute for class and With Timestamp and process IDs
-        Update the list periodically. By calling the method get_contianer_process method
-      '''
+#############################
 
 object1 = docker_sdk_abstraction()
 
@@ -281,14 +305,12 @@ mem_limit = if int specify memory limit in bytes or can specify values like 200m
 More options available at https://docker-py.readthedocs.io/en/stable/containers.html
 """
 
-
 container_arguments = { 'cpuset_cpus': "1", 'cpu_shares': 2000, 'mem_limit': "200m" }
 
-object1.container_create("docker-cpu-hog-i", container_arguments)
+object1.container_create("python-prog", container_arguments)
 object1.container_start()
 
 #print object1.get_container_image_name()
-
 #object1.container_log_stream()
 
 
@@ -298,15 +320,10 @@ object1.container_log()
 
 #print object1.get_container_image()
 
-
-
 #while(object1.get_container_status == "running"):
 #  pass
 
-
-
 # object1.start_container()
-
 # print object1.get_container_name()
 
 

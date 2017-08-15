@@ -99,7 +99,7 @@ class docker_sdk_abstraction():
 
   # Following are the class methods 
 
-  def container_create(self, docker_image_tag_name):
+  def container_create(self, docker_image_tag_name, container_arguments):
     '''
      <Purpose>
       Create a docker container using containers.create method.
@@ -109,7 +109,10 @@ class docker_sdk_abstraction():
       1) Image name for which container is to created.
       2) A Dictonary which can be used for setting up the arguments for the containers.create() method.  
     '''
-    self.container_obj = self.docker_api_obj.containers.create(docker_image_tag_name) 
+
+    print container_arguments
+
+    self.container_obj = self.docker_api_obj.containers.create(docker_image_tag_name, **container_arguments) 
  
 
   def container_start(self):
@@ -132,6 +135,8 @@ class docker_sdk_abstraction():
 
       container_run_log = self.docker_api_obj.containers.run(docker_image_tag_name, detach=detach_mode)
       return container_run_log
+
+
     
     else:
       # Docker container won't run in foreground
@@ -178,8 +183,6 @@ class docker_sdk_abstraction():
       None  
     '''
 
-
-
     # Reloading the container object attributes, especially needed for the status
     self.container_obj.reload()
 
@@ -187,8 +190,6 @@ class docker_sdk_abstraction():
     filename = self.get_container_id_short()+"-"+self.get_container_image_name()+"-output-file.log"
 
     log_file_obj = open(filename, "w+")
-
-
 
     # Gives generator stream object helper
     log_stream = self.container_obj.logs(stdout = True, stderr = True, stream = True, follow = True)
@@ -253,15 +254,40 @@ class docker_sdk_abstraction():
 
 
   def get_container_process(self):
-    processes = self.container_obj.top()
-    print processes
+
+    if(self.get_container_status() != "exited"):
+      processes = self.container_obj.top()
+      print str(processes) + "\n"
+
+      ''' It gives the process ID of processes running inside the container in format like
+
+         {u'Processes': [[u'root', u'27138', u'27121', u'30', u'16:36', u'?', u'00:00:01', 
+         u'mplayer -benchmark -vo null -ao null ./Sintel.mp4']], 
+         u'Titles': [u'UID', u'PID', u'PPID', u'C', u'STIME', u'TTY', u'TIME', u'CMD']}
+  
+        Planning to : Make a list attribute for class and With Timestamp and process IDs
+        Update the list periodically. By calling the method get_contianer_process method
+      '''
 
 object1 = docker_sdk_abstraction()
 
-object1.container_create("docker-cpu-hog-i")
+"""
+Important note here
+-------------------------
+cpu_cpus Datatype = int or String
+cpu_shares Datatype = int only
+mem_limit = if int specify memory limit in bytes or can specify values like 200m 4000k 1g
+
+More options available at https://docker-py.readthedocs.io/en/stable/containers.html
+"""
+
+
+container_arguments = { 'cpuset_cpus': "1", 'cpu_shares': 2000, 'mem_limit': "200m" }
+
+object1.container_create("docker-cpu-hog-i", container_arguments)
 object1.container_start()
 
-print object1.get_container_image_name()
+#print object1.get_container_image_name()
 
 #object1.container_log_stream()
 

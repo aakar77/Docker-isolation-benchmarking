@@ -9,17 +9,23 @@ Description:
   Get the log from the container.
   Get the container ID.
   Get the statistics regarding a container.
+  Get Process IDs of the process running inside the doker container
 
 Important Note:
-  This class is not full creating the containers and Not for creating docker images.
-  Docker images can also be created using the Python Docker SDK. It is not my focus currently.
-  For more Information about the Docker SDk for python: https://docker-py.readthedocs.io/en/stable/
+  This class is only for managing the containers and Not for creating docker images.
+  Docker images can also be created using the Python Docker SDK. 
+  It is not my focus currently.
+  For more Information about the Docker SDk for python: 
+  https://docker-py.readthedocs.io/en/stable/
 
 Special Note:
   Three ways for creating a docker container
-  1) Use Docker SDK docker run method - using detached = false - Will run container in foreground
-  2) Use Docker SDK docker run method - using detached = True - Will run the container in backrgoud; returns container class object
-  3) Use Docker SDK docker create method; gives container class object and then invoke start method on the container object.
+  1) Use Docker SDK docker run method - using detached = false - 
+     Will run container in foreground
+  2) Use Docker SDK docker run method - using detached = True - 
+     Will run the container in backrgoud; returns container class object
+  3) Use Docker SDK docker create method; 
+     gives container class object and then invoke start method on the container object.
 
   2) and 3) method gives container object
 '''
@@ -28,6 +34,8 @@ import docker
 from itertools import izip
 import json
 import datetime
+import time
+import csv
 
 
 class docker_sdk_abstraction():
@@ -44,6 +52,8 @@ class docker_sdk_abstraction():
     self.docker_api_obj = docker.from_env() 
     self.container_obj = None
     self.process_set = set()
+    self.container_start_timestamp = None
+    self.stats_dict = None
 
   # Following are the Getter methods for getting Docker Api Container Object attributes
 
@@ -122,8 +132,7 @@ class docker_sdk_abstraction():
        u'mplayer -benchmark -vo null -ao null ./Sintel.mp4']], 
        u'Titles': [u'UID', u'PID', u'PPID', u'C', u'STIME', u'TTY', u'TIME', u'CMD']}
   
-        Planning to : Make a list attribute for class and add process IDs to it
-        Update the list periodically. By calling the method get_contianer_process method
+      Made a set attribute that stores the process running inside the docker container.
       
       """
 
@@ -220,7 +229,6 @@ class docker_sdk_abstraction():
 
     log_file_obj = open(filename, "w+")
 
-
     #update container procees set attribute
     self.container_obj.set_container_process()
 
@@ -242,6 +250,10 @@ class docker_sdk_abstraction():
       #update container procees set attribute
       self.set_container_process()
 
+      """
+      Break the generator stream, once the container status turns exicted.
+      If not, it will produce 0 values for all the other fields.
+      """
       if(self.get_container_status() == "exited"):
         stat_file_obj.close()
         break
@@ -251,9 +263,15 @@ class docker_sdk_abstraction():
     <Purpose>
       This method is for getting the statistics stream during the container execution.
       It creates a stats file with the filename as container short id + stat-file.log.
-      This method will return back only after the container has completed its execution. i.e. status = exited
+      This method will return back only after the container has completed its execution. 
+      i.e. status = exited
 
-      Next Task would be: Manually logging cpu and memory data and calculating average over them.
+      Next Task would be: Manually logging cpu and memory data and calculating average 
+      over them.
+      
+      A suggestion by Lukas to log these stats into a CSV file and parse the file after
+      completion. 
+
     <Arguments>
       None
     <Return>
@@ -266,30 +284,61 @@ class docker_sdk_abstraction():
     self.container_obj.reload()
 
     # Creating file name. 
-    filename = self.get_container_id_short() +"-"+self.get_container_image_name()+"-stats-file.log"
+    filename = self.get_container_id_short() +"-"+self.get_container_image_name()+"-stats-file.csv"
 
-    stat_file_obj = open(filename, "w+")
+    #stat_file_obj = open(filename, "w+")
 
-    # Gives generator stream object helper
-    stats_stream = self.container_obj.stats(decode=True)
-    
-    for data in izip(stats_stream):
+    # Gives generator stream object helper  
+    stats_stream = self.container_obj.stats(decode=True, stream = True)
+
+    writer = csv.writer(open(filename, 'w+'))
+
+    for stats_tuple in izip(stats_stream):
 
       # Updating the container object attributes, especially the container status
       self.container_obj.reload()
-      
-      self.get_container_process()
-      
-      # Dumping the stats stream data, in the file 
-      json.dump(data, stat_file_obj, indent = 4)  
+        
+      # Getting memory stat dictionary
+      read_timestamp = stats_tuple[0]['read']
+      preread_timestamp = stats_tuple[0]['preread']
+      memory_stat = stats_tuple[0]['memory_stats']
 
-      #update container procees set attribute
-      self.set_container_process()
+      memory_usage = memory_stat.get('usage')
+      memory_limit = memory_stat.get('limit')
+      memory_max_usage = memory_stat.get('max_usage')
 
-      # If the container has exited, close the file object and break the for loop
+      csv_row = [read_timestamp, preread_timestamp, memory_usage, memory_limit, memory_max_usage ]
+
+      #print csv_row
+
+      writer.writerow(csv_row)
+      
+      # If the container has exited, close the file object and break the for loopn 
       if(self.get_container_status() == "exited"):
         stat_file_obj.close()
         break
+
+
+
+    """
+      # Getting CPU stats dictonary
+      cpu_stat = stats_tuple[0]['cpu_stats']
+      
+      # Dumping the stats stream data, in the file 
+      json.dump(stats_tuple, stat_file_obj, indent = 4)  
+
+      #update container procees set attribute
+      self.set_container_process()  
+    """
+      
+    def list_containers(self, method_options):
+      
+      # sending a dict of container arguments. It returns a list of containers 
+      list_containers = self.docker_api_obj(**method_options)
+
+
+
+
 
 #############################
 
@@ -303,21 +352,20 @@ cpu_shares Datatype = int only
 mem_limit = if int specify memory limit in bytes or can specify values like 200m 4000k 1g
 
 More options available at https://docker-py.readthedocs.io/en/stable/containers.html
-"""
 
+"""
 container_arguments = { 'cpuset_cpus': "1", 'cpu_shares': 2000, 'mem_limit': "200m" }
 
-object1.container_create("python-prog", container_arguments)
+object1.container_create("docker-mplayer-i", container_arguments)
 object1.container_start()
 
 #print object1.get_container_image_name()
 #object1.container_log_stream()
 
-
 object1.container_stats_stream()
 object1.container_log()
 
-
+"""
 #print object1.get_container_image()
 
 #while(object1.get_container_status == "running"):
@@ -326,7 +374,6 @@ object1.container_log()
 # object1.start_container()
 # print object1.get_container_name()
 
-
-
+"""
 
 
